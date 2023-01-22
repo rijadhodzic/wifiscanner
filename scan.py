@@ -1,56 +1,54 @@
-from tqdm import tqdm
-import subprocess
-import stem.process
+import os
 import time
+from tqdm import tqdm
 
-def wifi_scan():
-    print("Starting Tor process...")
-    # Start the Tor process
-    with stem.process.launch_tor_with_config(config={'SocksPort': "9050"}) as tor:
-        # Wait for the Tor process to establish a connection
-        for _ in tqdm(range(30), desc="Waiting for Tor connection"):
-            if tor.is_alive():
-                break
-            time.sleep(1)
-        print("Connected to Tor network.")
-        # Update the SOCKS proxy settings to use the Tor socks port
-        os.environ["all_proxy"] = "socks5h://127.0.0.1:9050"
+def check_wifi_drivers():
+    # check if wifi drivers are installed
+    drivers_installed = os.system("lsmod | grep -i 'rtl8723be'")
+    if drivers_installed != 0:
+        # install wifi drivers
+        os.system("sudo apt-get update")
+        os.system("sudo apt-get install rtl8723be-dkms")
+        os.system("sudo modprobe rtl8723be")
+    else:
+        print("WiFi drivers are already installed.")
 
-        # Check the status of the Wi-Fi interface
-        interface = "wlan0" # change this to the name of your interface
-        output = subprocess.check_output(['ip', 'link', 'show', interface])
-        output = output.decode()
-        if "DOWN" in output:
-            # Bring the interface up if it's down
-            subprocess.run(['ip', 'link', 'set', interface, 'up'])
-        # Run the command 'iwlist scan' to scan for nearby Wi-Fi networks
-        output = subprocess.check_output(['iwlist', 'scan'])
-        output = output.decode()
+def scan_wifi():
+    # scan for wifi networks
+    print("Scanning for WiFi networks...")
+    os.system("sudo iwlist wlan0 scan | grep ESSID > wifi_scan.txt")
+    # filter for open networks
+    os.system("grep 'ESSID:\"\"' wifi_scan.txt > open_wifi.txt")
+    print("WiFi scan complete, detailed results of open networks saved in 'open_wifi.txt'")
 
-        # Split the output into a list of strings, one for each Wi-Fi network
-        networks = output.split('Cell')[1:]
+def connect_wifi():
+    if not os.path.exists("open_wifi.txt"):
+        print("Error: open_wifi.txt not found. Make sure to run scan_wifi() first.")
+        return
+    # sort the networks by signal strength
+    os.system("sort -k 6 -n open_wifi.txt > sorted_wifi.txt")
+    # read the sorted list of networks
+    with open("sorted_wifi.txt", "r") as f:
+        wifi_list = f.readlines()
+    if not wifi_list:
+        print("Error: no open networks found.")
+        return
+    # connect to each network in order
+    for wifi in wifi_list:
+        ssid = wifi.split(":")[1].strip()
+        os.system(f"sudo nmcli device wifi connect {ssid} ifname wlan0")
+        print(f"Connected to {ssid}")
+        time.sleep(600) # wait for 10 minutes
 
-        # Open the file to save the information
-        with open('wifi_networks.txt', 'w') as f:
-            for network in networks:
-                # Split the network information into a list of strings
-                network_info = network.split('\n')
+def main():
+    check_wifi_drivers()
+    with tqdm(total=100) as pbar:
+        for i in range(100):
+            time.sleep(0.05)
+            pbar.update(1)
+            if i == 99:
+                scan_wifi()
+    connect_wifi()
 
-                # Get the network's ESSID (name)
-                essid = network_info[0].split('ESSID:')[1].strip()
-
-                # Check if the network is open or secured
-                security = None
-                for line in network_info:
-                    if 'Encryption key:' in line:
-                        security = line.split(':')[1].strip()
-                        break
-                if security == 'off':
-                    security = 'Open'
-                else:
-                    security = 'Secured'
-
-                # Write the network information to the file
-                f.write(f'ESSID: {essid}, Security: {security}\n')
-
-wifi_scan()
+if __name__ == "__main__":
+    main()
