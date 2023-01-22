@@ -28,15 +28,23 @@ def connect_wifi():
     # sort the networks by signal strength
     os.system("sort -k 6 -n open_wifi.txt > sorted_wifi.txt")
     # read the sorted list of networks
-    with open("sorted_wifi.txt", "r") as f:
-        wifi_list = f.readlines()
+    try:
+        with open("sorted_wifi.txt", "r") as f:
+            wifi_list = f.readlines()
+    except IOError as e:
+        print(f'Error: {e}')
+        return
     if not wifi_list:
         print("Error: no open networks found.")
         return
     # connect to each network in order
     for wifi in wifi_list:
         ssid = wifi.split(":")[1].strip()
-        os.system(f"sudo nmcli device wifi connect {ssid} ifname wlan0")
+        try:
+            os.system(f"sudo nmcli device wifi connect {ssid} ifname wlan0")
+        except Exception as e:
+            print(f'Error: {e}')
+            continue
         print(f"Connected to {ssid}")
         time.sleep(600) # wait for 10 minutes
 
