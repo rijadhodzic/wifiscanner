@@ -11,7 +11,3 @@ Next, create a new file on your system, and copy the script provided above into 
 Make the script executable by running the command chmod +x wifi_script.py in the terminal.
 
 To run the script, open a terminal and navigate to the directory where the script is saved. Then run the command ./wifi_script.py
-
-The script will first check if the WiFi drivers are installed. If they are not, it will install them and load them.
-
-After that, it will display a progress bar while scanning for WiFi networks. Once the scan is complete, it will save the detailed results of open networks in a file named open_wifi.txt.
